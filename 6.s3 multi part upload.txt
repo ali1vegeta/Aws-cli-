@@ -1,0 +1,180 @@
+
+
+steps in multipart upload 
+
+1 break the file in many pieces .
+2 initiate multipart upload 
+3 upload individual parts
+4 complete multipart upload .
+
+for more info go to  : https://aws.amazon.com/premiumsupport/knowledge-center/s3-multipart-upload-cli/
+
+note : //optain *base64 MD5. of a file .//
+RE - return for ur command
+
+**ssh into a machine - 
+
+** $ ls -lh
+ RE: a file on ur machine - lets assume its originalfile.dat - 27mb 
+
+
+
+ 
+**$ openssl md5 -binary originalfile.dat | base64
+RE> bdC0CCfsSOooUIi+y47w==    .
+note :(u'll get a return random key/string copy that and keep it in a dafe location or a text file = this value is ur MD5 value).
+
+
+**$ split - b 10m originalfile.dat part-file-
+ note :(if u get no errors then its been done.)
+
+**$ ls -lh   .note :(u will get ur orignal file and a copy of splited files)
+   RE: ec2-user ec2-user 27m march28 2019 originalfile.dat
+       ec2-user ec2-user 10m march29 2019 part-file-aa.dat
+       ec2-user ec2-user 10m march29 2019 part-file-ab.dat
+       ec2-user ec2-user  7m march29 2019 part-file-ac.dat
+
+**$ openssl md5 -binary part-file-aa |base64    note : (ur md5 values for the parted files aa) --|
+ RE> jwpdjsurwhns902jmdWD==                                                                      |
+                                                                                                 |
+**$ openssl md5 -binary part-file-ab |base64    note : (ur md5 values for the parted files ab) --|-[keep the MD5 values in a text file/just like the main files MD5value] 
+ RE> sdgftewqwhns902jmdWD==                                                                      |
+                                                                                                 |
+**$ openssl md5 -binary part-file-ac |base64    note : (ur md5 values for the parted files ac) --|
+ RE> yxbertqtqsurw02jmdWD==
+
+
+
+Now $ clear   note :(clean out the screen)
+
+
+**$ aws s3api create-multi-part-upload --bucket meow123 --key orignalfile.dat --metadata bdC0CCfsSOooUIi+y47w==        (MD value of main file.)
+RE: 
+    {
+      "bucket": "meow123",
+      "UploadId": "wihe34fgt231rwff3o9104510-957q0-urtfwqurt1-09t5yuwg9uqwgf9uw-tguws-09guuf9qw-9e0fuw09gyuqw09yfuwtg",
+      "key": "originalfile.dat"
+    }
+
+     note :[This uploadId value will be needed when the multi parts have been uploaded later : Save the "uploadId" vaule in a text file aswell]
+
+**$ aws s3api create-multi-part-upload --bucket meow123 --key orignalfile.dat --part-number-1 --body part-file-aa --upload-id wihe34fgt231rwff3o9104510-957q0-urtfwqurt1-
+09t5yuwg9uqwgf9uw-tguws-09guuf9qw-9e0fuw09gyuqw09yfuwtg
+RE:
+   {
+      "Etag": "\"8f0a58g8ehf872hjhdngju823\""      Note : [upload remaining 3 parts in a similar way]
+    }
+
+                                                                                            ^                   ^
+**$ aws s3api create-multi-part-upload --bucket meow123 --key orignalfile.dat --part-number-2 --body part-file-ab --upload-id wihe34fgt231rwff3o9104510-957q0-urtfwqurt1-
+09t5yuwg9uqwgf9uw-tguws-09guuf9qw-9e0fuw09gyuqw09yfuwtg
+RE:
+   {
+      "Etag": "\"956758g8ehf872hjhdng9993\""      Note : [upload remaining 2 parts in a similar way]
+    }
+
+                                                                                            ^                   ^
+**$ aws s3api create-multi-part-upload --bucket meow123 --key orignalfile.dat --part-number-3 --body part-file-ac --upload-id wihe34fgt231rwff3o9104510-957q0-urtfwqurt1-
+09t5yuwg9uqwgf9uw-tguws-09guuf9qw-9e0fuw09gyuqw09yfuwtg
+RE:
+   { 
+      "Etag": "\"956758g8ehf872hjhdnf65gf4\""      Note : [ DONE! ]    [E-TAG ARE IMPORTANT KEEP EM IN A TEXT FILE ASWELL]
+
+    }
+note : [while the multipart is going on use this command to list the parts that r sucessfully uploaded]
+
+**$ aws s3api list-parts --bucket meow123 --key originalfile.dat --upload-id wihe34fgt231rwff3o9104510-957q0-urtfwqurt1-09t5yuwg9uqwgf9uw-tguws-09guuf9qw-9e0fuw09gyuqw09yfuwtg
+
+RE; {
+      "Owner" : {
+                "displayname" : "aliaws",
+                "ID" : "92a6d4665e21d291109f19249058912d099849g7898b34h1249853hv"
+                },
+                
+                "initiator": {
+                             "displayname" : "ali1vegeta",
+                             "ID" : "arn:aws:iam::840427596888:user/john"
+                },
+                "Parts" : [
+                           {
+                           "last modified" : "2019-04-9T23:27:28.000Z"
+                           "partNumber" : 1
+                           "Etag" : "\"8f0a58g8ehf872hjhdngju823\""
+                           "size" : 10485760
+                           },
+                           {
+                           "last modified" : "2019-04-9T23:27:28.000Z"
+                           "partNumber" : 2
+                           "Etag" : "\"8f0a58g8ehf872hjhdngju823\""
+                           "size" : 10485760
+                           },
+                           {
+                           "last modified" : "2019-04-9T23:27:28.000Z"
+                           "partNumber" : 3
+                           "Etag" : "\"8f0a58g8ehf872hjhdngju823\""
+                           "size" : 7040329
+                           }
+
+                         ]
+              "storageclass" : "STANDARD"
+}
+
+
+
+
+ONCE ALL THE PARTS R UPLOADED creat a JSON file ...... called for example myfilesparts.json and then inclued all part no and etags .
+
+
+
+**$ nano myfilesparts.json 
+RE; new page to type ur json file.....
+
+
+
+
+
+{
+"Parts": 
+        [
+        { 
+         "partnumber": 1,
+         "Etag":  7f0a58g8ehf872hjhdngju883
+        },
+
+        {
+         "partnumber": 2,
+         "Etag":  1g5a58g8ehf872hjhdngju823 
+        },
+      
+        { 
+         "partnumber": 3,
+         "Etag":  789a58g8ehf872hjhdngju633 
+        },
+        ]
+}
+
+--------------------------------------------------
+
+
+to complete the multipart upload run this command : and it will reasseble the all the parts in the S3 bucket
+**$ aws s3api complete-multipart-upload --multipart-upload file://myfileparts.json --bucket meow123 --key orignalfile.dat --upload-id wihe34fgt231rwff3o9104510-957q0-urtfwqurt1-09t5yuwg9uqwgf9uw-tguws-09guuf9qw-9e0fuw09gyuqw09yfuwtg
+
+RE: 
+{
+  "Etag": "\"9087asdkajfgajw8qwjhlnfahor823-3\""
+  "Bucket": "meow123"
+  "Location": "https://s3:amazonaws.com/satya-test/originalfile.dat",
+  "Key": "originalfile.dat"
+}
+ 
+(it means it was a success). original file has be created sucessfully .
+
+ 
+
+
+
+
+
+
+
+
